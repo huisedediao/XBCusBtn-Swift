@@ -58,6 +58,9 @@ class XBCusBtn: UIControl {
     /** 选中状态的文字颜色，默认黑色 */
     var titleColorSelected:UIColor?{didSet{titleColor=titleColorSelected!}}
     
+    /** 高亮状态的文字颜色，默认黑色 */
+    var titleColorHighlight=UIColor.black
+    
     /** 标题字体，默认15号系统字体 */
     var titleFont:UIFont{didSet{setNeedsDisplay()}}
     
@@ -66,12 +69,9 @@ class XBCusBtn: UIControl {
     
     /** 选中状态的背景图片 */
     var backgroundImageSelected:UIImage?{didSet{backgroundImage=backgroundImageSelected}}
-    
-    /** 正常状态的背景颜色 */
-    var backgroundColorNormal:UIColor?{didSet{backgroundColor=backgroundColorNormal}}
-    
+
     /** 高亮状态的背景颜色 */
-    var backgroundColorHighlight:UIColor?
+    var backgroundColorHighlight:UIColor = UIColor.black
     
     /** 点击回调,如果用到拥有者的self指针，需要weak，否则循环引用 */
     var block:ActionBlock?
@@ -103,12 +103,22 @@ class XBCusBtn: UIControl {
         title=""
         imageSize=CGSize.zero
         spaceToContentSide=0;
-        contentSide = .center;
-        backgroundColorNormal=UIColor.clear
+        contentSide = .center
         super.init(frame: frame)
         backgroundColor=UIColor.clear
         layer.masksToBounds=true;
         addTarget(self, action: #selector(selfClick), for: UIControlEvents.touchUpInside)
+        addObserver(self, forKeyPath: "highlighted", options: NSKeyValueObservingOptions.new, context: nil)
+    }
+    
+    override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+        if keyPath == "highlighted" {
+            setNeedsDisplay()
+        }
+    }
+    
+    deinit {
+        removeObserver(self, forKeyPath: "highlighted")
     }
     
     required init?(coder aDecoder: NSCoder) {
@@ -165,16 +175,29 @@ class XBCusBtn: UIControl {
         
         if backgroundImage != nil{backgroundImage?.draw(in: rect)}
         if image != nil{image?.draw(in: CGRect(x: imageOrigin.x, y: imageOrigin.y, width: imageRectSize.width, height: imageRectSize.height))}
+
+        setTitleWithColor(color: titleColor!)
+        
+        if isHighlighted
+        {
+            backgroundColorHighlight.set()
+            UIRectFillUsingBlendMode(rect, CGBlendMode.multiply)
+            
+            setTitleWithColor(color: titleColorHighlight)
+        }
+    }
+    
+    func setTitleWithColor(color:UIColor) -> Void {
         if title.isEmpty == false
         {
-            
             var dict = [String:Any]()
-            dict[NSForegroundColorAttributeName]=titleColor
+            dict[NSForegroundColorAttributeName]=color
             dict[NSFontAttributeName]=titleFont
             let nsTitle = title as NSString
             nsTitle.draw(in: CGRect(x: titleOrigin.x, y: titleOrigin.y, width: titleRectSize.width, height: titleRectSize.height), withAttributes: dict)
         }
     }
+
     
     private func getImageOriginWith(rect:CGRect) -> Void
     {
@@ -350,16 +373,16 @@ class XBCusBtn: UIControl {
         if (title.isEmpty == false)
         {
             let textWith = XBPublicFunctions.getWidthWith(text: title, font: font)
+            var rectW:CGFloat = 0
             if (contentType == XBCusBtnContentType.imageTop || contentType==XBCusBtnContentType.imageBottom)
             {
-                let rectW=rect.size.width;
-                titleRectSize=XBPublicFunctions.getAdjustSizeWith(text: title, maxWidth:XBPublicFunctions.selectItemBy(bool: (textWith > rectW), item1: rectW, item2: textWith) as! CGFloat, font: font)
+                rectW=rect.size.width;
             }
             else
             {
-                let rectW=(rect.size.width-spaceToContentSide-imageRectSize.width-spaceOfImageAndTitle);
-                titleRectSize=XBPublicFunctions.getAdjustSizeWith(text: title, maxWidth: XBPublicFunctions.selectItemBy(bool: (textWith>rectW), item1: rectW, item2: textWith) as! CGFloat, font: font)
+                rectW=(rect.size.width-spaceToContentSide-imageRectSize.width-spaceOfImageAndTitle);
             }
+            titleRectSize=XBPublicFunctions.getAdjustSizeWith(text: title, maxWidth: ( textWith > rectW ? rectW : textWith), font: font)
         }
     }
     
@@ -400,25 +423,6 @@ class XBCusBtn: UIControl {
         }
     }
     
-    override var isHighlighted: Bool{
-        didSet{
-            if isHighlighted
-            {
-                if backgroundColorHighlight != nil
-                {
-                    backgroundColor=backgroundColorHighlight;
-                }
-                else
-                {
-                    backgroundColor=backgroundColorNormal;
-                }
-            }
-            else
-            {
-                backgroundColor=backgroundColorNormal;
-            }
-        }
-    }
     
     override var isSelected: Bool{
         didSet{
